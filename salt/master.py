@@ -8,6 +8,7 @@ involves preparing the three listeners and the workers needed by the master.
 from __future__ import absolute_import, with_statement
 import copy
 import ctypes
+import functools
 import os
 import re
 import sys
@@ -87,6 +88,8 @@ try:
 except ImportError:
     HAS_HALITE = False
 
+from tornado.stack_context import StackContext
+from salt.utils.ctx import RequestContext
 
 log = logging.getLogger(__name__)
 
@@ -900,7 +903,14 @@ class MWorker(SignalHandlingMultiprocessingProcess):
         log.trace('AES payload received with command {0}'.format(data['cmd']))
         if data['cmd'].startswith('__'):
             return False
-        return self.aes_funcs.run_func(data['cmd'], data)
+
+        def run_func(data):
+            return self.aes_funcs.run_func(data['cmd'], data)
+
+        with StackContext(functools.partial(RequestContext,
+                                            {'data': data,
+                                             'opts': self.opts})):
+            return run_func(data)
 
     def run(self):
         '''
