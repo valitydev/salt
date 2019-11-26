@@ -29,6 +29,7 @@ import multiprocessing
 # Import 3rd-party libs
 import salt.ext.six as six
 from salt.ext.six.moves.urllib.parse import urlparse  # pylint: disable=import-error,no-name-in-module
+from salt.utils.ctx import RequestContext
 
 # Let's define these custom logging levels before importing the salt.log.mixins
 # since they will be used there
@@ -303,6 +304,18 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
     def _log(self, level, msg, args, exc_info=None, extra=None,  # pylint: disable=arguments-differ
              exc_info_on_loglevel=None):
         # If both exc_info and exc_info_on_loglevel are both passed, let's fail
+        if extra is None:
+            extra = {}
+
+        current_jid = RequestContext.current.get('data', {}).get('jid', None)
+        log_fmt_jid = RequestContext.current.get('opts', {}).get('log_fmt_jid', None)
+
+        if current_jid is not None:
+            extra['jid'] = current_jid
+
+        if log_fmt_jid is not None:
+            extra['log_fmt_jid'] = log_fmt_jid
+
         if exc_info and exc_info_on_loglevel:
             raise RuntimeError(
                 'Only one of \'exc_info\' and \'exc_info_on_loglevel\' is '
@@ -333,6 +346,8 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
                    func=None, extra=None, sinfo=None):
         # Let's remove exc_info_on_loglevel from extra
         exc_info_on_loglevel = extra.pop('exc_info_on_loglevel')
+
+        jid = extra.pop('jid', '')
         if not extra:
             # If nothing else is in extra, make it None
             extra = None
@@ -391,6 +406,7 @@ class SaltLoggingClass(six.with_metaclass(LoggingMixInMeta, LOGGING_LOGGER_CLASS
             logrecord.exc_info_on_loglevel_formatted = None
 
         logrecord.exc_info_on_loglevel = exc_info_on_loglevel
+        logrecord.jid = jid
         return logrecord
 
     # pylint: enable=C0103
